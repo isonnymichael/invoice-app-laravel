@@ -11,12 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('counters', function (Blueprint $table) {
-            $table->id();
-            $table->string('key')->unique();
-            $table->string('prefix');
-            $table->string('value');
-            $table->timestamps();
+        Schema::table('customers', function (Blueprint $table) {
+            $table->string('address');
         });
     }
 
@@ -25,6 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('counters');
+        Schema::table('customers', function (Blueprint $table) {
+            $table->dropColumn('address');
+        });
     }
 };
