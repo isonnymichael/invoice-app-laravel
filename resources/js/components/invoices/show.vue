@@ -27,6 +27,17 @@
         window.print();
         router.push('/').catch(()=>{});
     }
+
+    const onEdit = (id)=>{
+        router.push('/invoice/edit/'+id)
+    }
+
+    const deleteInvoice = (id)=>{
+        if (confirm("Are you sure delete this Invoice?")) {
+            axios.get('/api/delete_invoice/'+id)
+            router.push('/')
+        }
+    }   
 </script>
 
 <template>
@@ -34,8 +45,9 @@
         <div class="invoices">
             
             <div class="card__header">
-                <div>
+                <div style="display:flex;width:100%;justify-content: space-between;">
                     <h2 class="invoice__title">Invoice</h2>
+                    <router-link to="/" style="color:white;align-self:center">Back to home</router-link>
                 </div>
                 <div>
                     
@@ -59,7 +71,7 @@
                         </li>
                         <li>
                             <!-- Select Btn Option -->
-                            <button class="selectBtnFlat">
+                            <button class="selectBtnFlat" @click="onEdit(form.id)">
                                 <i class=" fas fa-reply"></i>
                                 Edit
                             </button>
@@ -67,7 +79,7 @@
                         </li>
                         <li>
                             <!-- Select Btn Option -->
-                            <button class="selectBtnFlat ">
+                            <button class="selectBtnFlat " @click="deleteInvoice(form.id)">
                                 <i class=" fas fa-pencil-alt"></i>
                                 Delete
                             </button>

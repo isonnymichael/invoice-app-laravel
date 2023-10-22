@@ -1,30 +1,31 @@
 <script setup>
-    import axios from "axios";
-    import {onMounted, ref} from "vue"
-    import { useRouter } from "vue-router";
+    import axios from 'axios';
+    import { onMounted, ref } from 'vue'
+    import { useRouter } from "vue-router"
 
     const router = useRouter();
 
-    let form = ref([])
+    let form = ref({
+        id:''
+    })
     let customers = ref([])
     let customer_id = ref([])
-    let listCart = ref([])
     let listProducts = ref([])
     const showModal = ref(false)
     const hideModal = ref(true)
 
-    onMounted(async()=>{
-        indexForm();
-        getAllCustomers();
-        getProducts();
-        customer_id.value = -1;
+    const props = defineProps({
+        id:{
+            type:String,
+            default:''
+        }
     })
 
-    const indexForm = async()=>{
-        let response = await axios.get('/api/create_invoice')
-
-        form.value = response.data;
-    }
+    onMounted(async()=>{
+        getInvoice()
+        getAllCustomers()
+        getProducts()
+    })
 
     const getAllCustomers = async()=>{
         let response = await axios.get('/api/customers')
@@ -38,15 +39,29 @@
         listProducts.value = response.data.products;
     }
 
+    const getInvoice = async() =>{
+        let response = await axios.get(`/api/edit_invoice/${props.id}`)
+        form.value = response.data.invoice
+
+        customer_id.value = form.value.customer_id
+    }
+
+    const deleteInvoiceItem = (id, i)=>{
+        form.value.invoice_items.splice(i,1)
+        if(id != undefined){
+            axios.get('/api/delete_invoice_items/'+id)
+        }
+    }
+
     const addCart = (item) => {
         const itemCart = {
-            id : item.id,
+            product_id : item.id,
             item_code : item.item_code,
             description : item.description,
             unit_price : item.unit_price,
             quantity : 1
         }
-        listCart.value.push(itemCart);
+        form.value.invoice_items.push(itemCart);
         closeModal();
     }
 
@@ -57,30 +72,29 @@
         showModal.value = !hideModal.value
     }
 
-    const removeItem = (i)=>{
-        listCart.value.splice(i,1);
-    }
-
     const SubTotal = ()=>{
         let total = 0;
-        listCart.value.map((data)=>{
-            total += data.quantity*data.unit_price;
-        })
-
+        if(form.value.invoice_items){
+            form.value.invoice_items.map((data)=>{
+                total += data.quantity*data.unit_price;
+            })
+        }
         return total;
     }
 
     const Total = ()=>{
-        return SubTotal() - form.value.discount;
+        if(form.value.invoice_items){
+            return SubTotal() - form.value.discount;
+        }
     }
 
-    const onSave = ()=>{
-        if(listCart.value.length >= 1){
+    const onEdit = (id)=>{
+        if(form.value.invoice_items.length >= 1){
             let subtotal = SubTotal();
             let total = Total();
 
             const formData = new FormData();
-            formData.append('invoice_item', JSON.stringify(listCart.value))
+            formData.append('invoice_item', JSON.stringify(form.value.invoice_items))
             formData.append('customer_id', customer_id.value)
             formData.append('date', form.value.date)
             formData.append('due_date', form.value.due_date)
@@ -91,8 +105,8 @@
             formData.append('total', total)
             formData.append('terms_and_conditions', form.value.terms_and_conditions)
 
-            axios.post("/api/add_invoice",formData);
-            listCart.value = [];
+            axios.post(`/api/update_invoice/${id}`,formData);
+            form.value.invoice_items.value = [];
             router.push('/')
         }
     }
@@ -104,8 +118,8 @@
         
             <div class="card__header">
                 <div style="display:flex;width:100%;justify-content: space-between;">
-                    <h2 class="invoice__title">New Invoice</h2>
-                    <router-link to="/" style="color:white;align-self:center">Back to home</router-link>
+                    <h2 class="invoice__title">Edit Invoice</h2>
+                    <router-link :to="'/invoice/show/'+props.id" style="color:white;align-self:center">Back</router-link>
                 </div>
                 <div>
                     
@@ -148,8 +162,13 @@
                     </div>
         
                     <!-- item 1 -->
-                    <div class="table--items2" v-for="(itemCart, i) in listCart" :key="itemCart.id">
-                        <p>#{{ itemCart.item_code }} {{ itemCart.description }}</p>
+                    <div class="table--items2" v-for="(itemCart, i) in form.invoice_items" :key="itemCart.id">
+                        <p v-if="itemCart.product">
+                            #{{ itemCart.product.item_code }} {{ itemCart.product.description }}
+                        </p>
+                        <p v-else>
+                            #{{ itemCart.item_code }} {{ itemCart.description }}
+                        </p>
                         <p>
                             <input type="text" class="input" v-model="itemCart.unit_price">
                         </p>
@@ -160,14 +179,12 @@
                             $ {{ itemCart.quantity * itemCart.unit_price }}
                         </p>
                         <p v-else></p>
-                        <p style="color: red; font-size: 24px;cursor: pointer;" @click="removeItem(i)">
+                        <p style="color: red; font-size: 24px;cursor: pointer;" @click="deleteInvoiceItem(itemCart.id,i)">
                             &times;
                         </p>
                     </div>
                     <div style="padding: 10px 30px !important;">
-                        <button class="btn btn-sm btn__open--modal" @click="openModal()">
-                            Add New Line
-                        </button>
+                        <button class="btn btn-sm btn__open--modal"  @click="openModal()">Add New Line</button>
                     </div>
                 </div>
 
@@ -199,17 +216,17 @@
                     
                 </div>
                 <div>
-                    <a class="btn btn-secondary" @click="onSave()">
+                    <a class="btn btn-secondary" @click="onEdit(form.id)">
                         Save
                     </a>
                 </div>
             </div>
-        
+            
         </div>
         <!--==================== add modal items ====================-->
         <div class="modal main__modal " :class="{show: showModal}">
             <div class="modal__content">
-                <span class="modal__close btn__close--modal" @click="closeModal()">×</span>
+                <span class="modal__close btn__close--modal"  @click="closeModal()">×</span>
                 <h3 class="modal__title">Add Item</h3>
                 <hr><br>
                 <div class="modal__items">
@@ -233,5 +250,4 @@
             </div>
         </div>
     </div>
-
 </template>
